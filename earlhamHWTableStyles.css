@@ -1,0 +1,68 @@
+/* earlhamHWTable/earlhamHWTableStyles.css
+   Styles for the Earlham Hot Water Meter — Site Table view
+   Scoped under #earlhamHWTable-root to avoid conflicts with other pub/ui views */
+
+#earlhamHWTable-root {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  padding: 16px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+#earlhamHWTable-root .hw-table-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 12px 0;
+}
+
+#earlhamHWTable-root .hw-table-loading {
+  color: #555555;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+#earlhamHWTable-root .hw-table-error {
+  color: #c0392b;
+  padding: 8px 12px;
+  background: #fdecea;
+  border: 1px solid #e74c3c;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* ── Table ───────────────────────────────────────────────── */
+
+#earlhamHWTable-root .hw-site-table {
+  border-collapse: collapse;
+  width: 100%;
+  background: #ffffff;
+}
+
+#earlhamHWTable-root .hw-site-table th,
+#earlhamHWTable-root .hw-site-table td {
+  border: 1px solid #000000;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+/* Blue header with white text */
+#earlhamHWTable-root .hw-site-table thead th {
+  background-color: #1a56db;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+/* Data rows */
+#earlhamHWTable-root .hw-site-table tbody td {
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+/* Subtle hover highlight */
+#earlhamHWTable-root .hw-site-table tbody tr:hover {
+  background-color: #eef2ff;
+}
