@@ -46,6 +46,10 @@ window.earlhamHWTable = window.earlhamHWTable || {};
 
     loadStyles();
 
+    // Force elem to fill the SkySpark view pane
+    elem.style.width  = '100%';
+    elem.style.height = '100%';
+
     // ── Session credentials ──────────────────────────────────────────────────
     var session     = view.session();
     var attestKey   = session.attestKey();
