@@ -1,92 +1,120 @@
 /* earlhamHWTable/earlhamHWTableStyles.css
    Styles for the Earlham Hot Water Meter — Site Table view
-   Scoped under #earlhamHWTable-root to avoid conflicts with other pub/ui views */
+   Scoped under #earlhamHWTable-root to avoid conflicts with other pub/ui views
+   Brand colors: IMEG Orient Blue #01538b | IMEG Orange #ed9a30 | IMEG Red #cf2e2e */
+
+/* ── Root container ──────────────────────────────────────── */
 
 #earlhamHWTable-root {
-  font-family: 'Segoe UI', Arial, sans-serif;
-  padding: 16px;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  padding: 20px 24px;
   background: #ffffff;
   box-sizing: border-box;
-  width: 80%;
+  width: 90%;
   height: 100%;
   overflow: auto;
   margin: 0 auto;
+  color: #1a1a1a;
 }
+
+/* ── Title ───────────────────────────────────────────────── */
 
 #earlhamHWTable-root .hw-table-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 12px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #01538b;
+  margin: 0 0 14px 0;
+  padding: 4px 0 4px 10px;
+  border-left: 4px solid #ed9a30;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
+/* ── Status messages ─────────────────────────────────────── */
+
 #earlhamHWTable-root .hw-table-loading {
-  color: #555555;
+  color: #01538b;
   padding: 8px 0;
   font-size: 13px;
 }
 
 #earlhamHWTable-root .hw-table-error {
-  color: #c0392b;
+  color: #cf2e2e;
   padding: 8px 12px;
   background: #fdecea;
-  border: 1px solid #e74c3c;
-  border-radius: 4px;
+  border: 1px solid #cf2e2e;
+  border-radius: 3px;
   font-size: 13px;
   margin-top: 8px;
 }
 
-/* ── Table ───────────────────────────────────────────────── */
+/* ── Table shell ─────────────────────────────────────────── */
 
 #earlhamHWTable-root .hw-site-table {
   border-collapse: collapse;
   width: 100%;
   background: #ffffff;
+  font-size: 13px;
 }
 
 #earlhamHWTable-root .hw-site-table th,
 #earlhamHWTable-root .hw-site-table td {
-  border: 1px solid #000000;
-  padding: 8px 12px;
+  border: 1px solid #8a9ba8;
+  padding: 7px 10px;
   text-align: center;
+  vertical-align: middle;
 }
 
-/* Blue header with white text */
+/* ── Header — IMEG Orient Blue ───────────────────────────── */
+
 #earlhamHWTable-root .hw-site-table thead th {
-  background-color: #1a56db;
+  background-color: #01538b;
   color: #ffffff;
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.3px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
 }
 
-/* Data rows */
+/* ── Data rows — alternating stripes ─────────────────────── */
+
+#earlhamHWTable-root .hw-site-table tbody tr:nth-child(odd) {
+  background-color: #ffffff;
+}
+
+#earlhamHWTable-root .hw-site-table tbody tr:nth-child(even) {
+  background-color: #f0f5f9;
+}
+
 #earlhamHWTable-root .hw-site-table tbody td {
-  font-size: 13px;
   color: #1a1a1a;
 }
 
-/* Center numeric cells with tabular digits */
+/* Tabular numbers for numeric cells */
 #earlhamHWTable-root .hw-site-table tbody td.hw-cell-number {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-/* Subtle hover highlight */
+/* Hover — light IMEG blue tint */
 #earlhamHWTable-root .hw-site-table tbody tr:hover {
-  background-color: #eef2ff;
+  background-color: #cce0ef;
 }
 
-/* ── Totals footer ─────────────────────────────────────────── */
+/* ── Totals footer — IMEG Orient Blue ───────────────────── */
 
 #earlhamHWTable-root .hw-site-table tfoot tr {
-  background-color: #1a56db;
+  background-color: #01538b;
   color: #ffffff;
   font-weight: 700;
+  font-size: 13px;
 }
 
 #earlhamHWTable-root .hw-site-table tfoot td {
-  border-top: 2px solid #000000;
+  border-top: 2px solid #003d68;
 }
 
 #earlhamHWTable-root .hw-site-table tfoot td.hw-total-value {
