@@ -3,13 +3,12 @@
 // Columns and their display names are driven by grid metadata.
 // Columns with a {hidden} marker in their meta are skipped.
 //
-// Special column meta recognised by this renderer:
-//   total          {marker}  — include this column in the totals footer row
-//   background     {Str}     — CSS color to apply to cells in this column.
-//                              Applied unconditionally unless highlightAbove
-//                              is also set, in which case only cells whose
-//                              value exceeds that threshold are coloured.
-//   highlightAbove {Number}  — numeric threshold for background activation
+// Cell background colors are read from gridData.meta.presentation, a sub-grid
+// with columns {col, row, background} that maps 0-based row indices and column
+// names to CSS color strings.
+//
+// Columns with a {total} marker in their col meta are summed in a footer row.
+// Both Haystack Number objects and pre-formatted strings ("1,667") are parsed.
 
 window.earlhamHWTable = window.earlhamHWTable || {};
 window.earlhamHWTable.components = window.earlhamHWTable.components || {};
@@ -30,23 +29,44 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
   }
 
   /**
-   * Returns the numeric threshold from col.meta.highlightAbove, or null.
-   * Accepts both a plain JS number and a Haystack {_kind:"number"} object.
+   * Extract a numeric value for totalling purposes.
+   * Handles: plain JS number, Haystack {_kind:"number"}, and pre-formatted
+   * strings like "1,667" or "136,139" by stripping commas before parsing.
    */
-  function getHighlightAbove(colMeta) {
-    if (!colMeta || colMeta.highlightAbove === undefined || colMeta.highlightAbove === null) return null;
-    return numericVal(colMeta.highlightAbove);
-  }
-
-  /** Extract the raw JS number from a Haystack cell value, or null. */
-  function numericVal(val) {
+  function parseNumericVal(val) {
     if (val === null || val === undefined) return null;
     if (typeof val === 'number') return val;
     if (typeof val === 'object' && val._kind === 'number') return val.val;
+    if (typeof val === 'string') {
+      var cleaned = val.replace(/,/g, '').replace(/[^\d.\-]/g, '');
+      var n = parseFloat(cleaned);
+      return isNaN(n) ? null : n;
+    }
     return null;
   }
 
-  /** Format a Haystack number: 0 decimals for integers, 1 decimal otherwise. */
+  /**
+   * Build a cell-color lookup from gridData.meta.presentation.
+   * The presentation sub-grid has rows like:
+   *   { col: "columnName", row: 9, background: "red" }
+   * Returns: { rowIndex: { colName: cssColorStr } }
+   */
+  function buildCellColors(gridData) {
+    var colors = {};
+    var pres = gridData.meta && gridData.meta.presentation;
+    if (!pres || !pres.rows) return colors;
+    pres.rows.forEach(function (pRow) {
+      var rowIdx = pRow.row;
+      var colName = pRow.col;
+      var bg      = pRow.background;
+      if (rowIdx === undefined || rowIdx === null || !colName || !bg) return;
+      if (!colors[rowIdx]) colors[rowIdx] = {};
+      colors[rowIdx][colName] = bg;
+    });
+    return colors;
+  }
+
+  /** Format a Haystack number object for display. */
   function formatNumber(val) {
     if (val === null || val === undefined) return '\u2014';
     var num  = (typeof val === 'object') ? val.val  : val;
@@ -61,9 +81,12 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     if (val === null || val === undefined) return '\u2014';
     if (isIdCol) {
       if (typeof val === 'object' && val._kind === 'ref') return val.dis || val.val;
-      return utils.extractValue(val) || '\u2014';
+      return String(utils.extractValue(val) || '\u2014');
     }
+    // Haystack Number object — format with unit
     if (typeof val === 'object' && val._kind === 'number') return formatNumber(val);
+    // Pre-formatted strings ("136,139", "17.2 %") — pass through as-is
+    if (typeof val === 'string') return val;
     return String(utils.extractValue(val) || '\u2014');
   }
 
@@ -83,20 +106,18 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
       return !isHidden(col.meta);
     });
 
-    // Diagnostic: log column names, dis values, and any special meta flags
+    // Build per-cell background color map from presentation metadata
+    var cellColors = buildCellColors(gridData);
+
+    // Diagnostic: log visible columns and any presentation entries
     console.log('[earlhamHWTable] Visible columns:',
       visibleCols.map(function (col) {
-        var meta = col.meta || {};
-        var info = col.name + ' -> "' + (meta.dis || '(no dis)') + '"';
-        if (hasTotal(meta)) info += ' [total]';
-        if (typeof meta.background === 'string') {
-          info += ' [bg:' + meta.background;
-          var thresh = getHighlightAbove(meta);
-          if (thresh !== null) info += ' above ' + thresh;
-          info += ']';
-        }
-        return info;
+        return col.name + ':' + ((col.meta && col.meta.dis) || '?') +
+               (hasTotal(col.meta) ? ' [total]' : '');
       }));
+    if (Object.keys(cellColors).length) {
+      console.log('[earlhamHWTable] Presentation cell colors:', cellColors);
+    }
 
     var table = document.createElement('table');
     table.className = 'hw-site-table';
@@ -129,43 +150,28 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
       emptyRow.appendChild(emptyCell);
       tbody.appendChild(emptyRow);
     } else {
-      rows.forEach(function (row) {
+      rows.forEach(function (row, rowIdx) {
         var tr = document.createElement('tr');
 
         visibleCols.forEach(function (col) {
           var td      = document.createElement('td');
           var isIdCol = col.name === 'id';
           var rawVal  = row[col.name];
-          var meta    = col.meta || {};
 
           td.textContent = cellText(rawVal, isIdCol);
           if (!isIdCol) td.className = 'hw-cell-number';
 
-          // Apply background color from col.meta.background, optionally gated
-          // by col.meta.highlightAbove (only colour cells that exceed threshold)
-          var bgColor        = typeof meta.background === 'string' ? meta.background : null;
-          var highlightAbove = getHighlightAbove(meta);
-
-          if (bgColor !== null) {
-            var applyBg = false;
-            if (highlightAbove !== null) {
-              // Conditional: only when cell value exceeds threshold
-              var n = numericVal(rawVal);
-              if (n !== null && n > highlightAbove) applyBg = true;
-            } else {
-              // Unconditional: colour every cell in this column
-              applyBg = true;
-            }
-            if (applyBg) {
-              td.style.backgroundColor = bgColor;
-              td.style.color           = '#ffffff';
-              td.style.fontWeight      = '700';
-            }
+          // Apply background color from presentation grid (no JS threshold logic)
+          var bgColor = cellColors[rowIdx] && cellColors[rowIdx][col.name];
+          if (bgColor) {
+            td.style.backgroundColor = bgColor;
+            td.style.color           = '#ffffff';
+            td.style.fontWeight      = '700';
           }
 
-          // Accumulate totals
+          // Accumulate totals — parses both Haystack Numbers and "1,667" strings
           if (totals.hasOwnProperty(col.name)) {
-            var nv = numericVal(rawVal);
+            var nv = parseNumericVal(rawVal);
             if (nv !== null) totals[col.name] += nv;
           }
 
@@ -190,16 +196,7 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
           td.textContent = 'Total';
           td.className   = 'hw-total-label';
         } else if (totals.hasOwnProperty(col.name)) {
-          // Borrow the unit string from the first row that has one
-          var unit = null;
-          for (var r = 0; r < rows.length; r++) {
-            var v = rows[r][col.name];
-            if (v && typeof v === 'object' && v._kind === 'number' && v.unit) {
-              unit = v.unit;
-              break;
-            }
-          }
-          td.textContent = totals[col.name].toFixed(0) + (unit ? '\u00a0' + unit : '');
+          td.textContent = totals[col.name].toLocaleString(undefined, { maximumFractionDigits: 0 });
           td.className   = 'hw-cell-number hw-total-value';
         } else {
           td.textContent = '';
