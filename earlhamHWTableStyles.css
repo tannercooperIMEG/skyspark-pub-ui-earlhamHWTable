@@ -72,13 +72,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Red highlight: % vs campus average > 200% */
-#earlhamHWTable-root .hw-site-table tbody td.hw-cell-above-threshold {
-  background-color: #ef4444;
-  color: #ffffff;
-  font-weight: 700;
-}
-
 /* Subtle hover highlight */
 #earlhamHWTable-root .hw-site-table tbody tr:hover {
   background-color: #eef2ff;

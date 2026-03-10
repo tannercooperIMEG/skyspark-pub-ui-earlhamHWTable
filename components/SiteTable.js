@@ -5,7 +5,11 @@
 //
 // Special column meta recognised by this renderer:
 //   total          {marker}  — include this column in the totals footer row
-//   highlightAbove {Number}  — highlight cells whose value exceeds this number in red
+//   background     {Str}     — CSS color to apply to cells in this column.
+//                              Applied unconditionally unless highlightAbove
+//                              is also set, in which case only cells whose
+//                              value exceeds that threshold are coloured.
+//   highlightAbove {Number}  — numeric threshold for background activation
 
 window.earlhamHWTable = window.earlhamHWTable || {};
 window.earlhamHWTable.components = window.earlhamHWTable.components || {};
@@ -26,8 +30,8 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
   }
 
   /**
-   * Returns the numeric threshold for red-highlighting from col meta, or null.
-   * Reads col.meta.highlightAbove (Haystack Number or plain JS number).
+   * Returns the numeric threshold from col.meta.highlightAbove, or null.
+   * Accepts both a plain JS number and a Haystack {_kind:"number"} object.
    */
   function getHighlightAbove(colMeta) {
     if (!colMeta || colMeta.highlightAbove === undefined || colMeta.highlightAbove === null) return null;
@@ -79,12 +83,19 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
       return !isHidden(col.meta);
     });
 
-    // Diagnostic: log column names and their dis values
+    // Diagnostic: log column names, dis values, and any special meta flags
     console.log('[earlhamHWTable] Visible columns:',
       visibleCols.map(function (col) {
-        return col.name + ' -> "' + ((col.meta && col.meta.dis) || '(no dis)') + '"' +
-               (hasTotal(col.meta) ? ' [total]' : '') +
-               (getHighlightAbove(col.meta) !== null ? ' [highlightAbove:' + getHighlightAbove(col.meta) + ']' : '');
+        var meta = col.meta || {};
+        var info = col.name + ' -> "' + (meta.dis || '(no dis)') + '"';
+        if (hasTotal(meta)) info += ' [total]';
+        if (typeof meta.background === 'string') {
+          info += ' [bg:' + meta.background;
+          var thresh = getHighlightAbove(meta);
+          if (thresh !== null) info += ' above ' + thresh;
+          info += ']';
+        }
+        return info;
       }));
 
     var table = document.createElement('table');
@@ -120,24 +131,37 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     } else {
       rows.forEach(function (row) {
         var tr = document.createElement('tr');
+
         visibleCols.forEach(function (col) {
-          var td             = document.createElement('td');
-          var isIdCol        = col.name === 'id';
-          var rawVal         = row[col.name];
-          var highlightAbove = getHighlightAbove(col.meta);
+          var td      = document.createElement('td');
+          var isIdCol = col.name === 'id';
+          var rawVal  = row[col.name];
+          var meta    = col.meta || {};
 
           td.textContent = cellText(rawVal, isIdCol);
+          if (!isIdCol) td.className = 'hw-cell-number';
 
-          var classes = [];
-          if (!isIdCol) classes.push('hw-cell-number');
+          // Apply background color from col.meta.background, optionally gated
+          // by col.meta.highlightAbove (only colour cells that exceed threshold)
+          var bgColor        = typeof meta.background === 'string' ? meta.background : null;
+          var highlightAbove = getHighlightAbove(meta);
 
-          // Red highlight when value exceeds the column's highlightAbove threshold
-          if (highlightAbove !== null) {
-            var n = numericVal(rawVal);
-            if (n !== null && n > highlightAbove) classes.push('hw-cell-above-threshold');
+          if (bgColor !== null) {
+            var applyBg = false;
+            if (highlightAbove !== null) {
+              // Conditional: only when cell value exceeds threshold
+              var n = numericVal(rawVal);
+              if (n !== null && n > highlightAbove) applyBg = true;
+            } else {
+              // Unconditional: colour every cell in this column
+              applyBg = true;
+            }
+            if (applyBg) {
+              td.style.backgroundColor = bgColor;
+              td.style.color           = '#ffffff';
+              td.style.fontWeight      = '700';
+            }
           }
-
-          if (classes.length) td.className = classes.join(' ');
 
           // Accumulate totals
           if (totals.hasOwnProperty(col.name)) {
@@ -147,6 +171,7 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
 
           tr.appendChild(td);
         });
+
         tbody.appendChild(tr);
       });
     }
