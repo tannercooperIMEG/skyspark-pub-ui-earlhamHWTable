@@ -7,9 +7,10 @@
   padding: 16px;
   background: #ffffff;
   box-sizing: border-box;
-  width: 100%;
+  width: 80%;
   height: 100%;
   overflow: auto;
+  margin: 0 auto;
 }
 
 #earlhamHWTable-root .hw-table-title {
@@ -63,6 +64,12 @@
 #earlhamHWTable-root .hw-site-table tbody td {
   font-size: 13px;
   color: #1a1a1a;
+}
+
+/* Right-align numeric value cells */
+#earlhamHWTable-root .hw-site-table tbody td.hw-cell-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Subtle hover highlight */

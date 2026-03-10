@@ -1,7 +1,7 @@
 // earlhamHWTable/earlhamHWTableHandler.js
 //
-// Main handler module — orchestrates stylesheet injection, data loading,
-// and table rendering. Loaded dynamically by earlhamHWTableEntry.js.
+// Main handler module — orchestrates stylesheet injection, variable reading,
+// data loading, and table rendering. Loaded dynamically by earlhamHWTableEntry.js.
 //
 // At startup this file exposes window.earlhamHWTableApp, which the entry
 // file delegates to. The name MUST differ from the entry file's jsHandler
@@ -30,6 +30,18 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     document.head.appendChild(link);
   }
 
+  /**
+   * Safely read a named variable from the SkySpark view (or its parent).
+   * Returns the Axon string representation, or null if not set.
+   */
+  function tryReadVar(view, varName) {
+    try {
+      var val = view.get(varName);
+      if (val) return val.toStr ? val.toStr() : String(val);
+    } catch (e) {}
+    return null;
+  }
+
   // ── Public handler ─────────────────────────────────────────────────────────
 
   /**
@@ -55,6 +67,12 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     var attestKey   = session.attestKey();
     var projectName = session.proj().name();
 
+    // ── View variables ───────────────────────────────────────────────────────
+    // targets: equipment set ref (e.g. "@nav:equip.all")
+    // dates:   date range expression (e.g. "pastMonth" or "2025-01-01..2025-01-31")
+    var targets = tryReadVar(view, 'targets') || tryReadVar(view.parent(), 'targets') || '@nav:equip.all';
+    var dates   = tryReadVar(view, 'dates')   || tryReadVar(view.parent(), 'dates')   || 'pastMonth';
+
     // ── DOM scaffold ─────────────────────────────────────────────────────────
     var root = document.createElement('div');
     root.id  = APP_ID;
@@ -62,19 +80,19 @@ window.earlhamHWTable = window.earlhamHWTable || {};
 
     var title = document.createElement('div');
     title.className   = 'hw-table-title';
-    title.textContent = 'Hot Water Meter — Sites';
+    title.textContent = 'Hot Water Meter \u2014 95% Demand Values';
     root.appendChild(title);
 
     var loadingEl = document.createElement('div');
     loadingEl.className   = 'hw-table-loading';
-    loadingEl.textContent = 'Loading sites\u2026';
+    loadingEl.textContent = 'Loading\u2026';
     root.appendChild(loadingEl);
 
     var tableContainer = document.createElement('div');
     root.appendChild(tableContainer);
 
-    // ── Data fetch → render ───────────────────────────────────────────────────
-    evals.loadSites(attestKey, projectName)
+    // ── Data fetch \u2192 render ───────────────────────────────────────────────────
+    evals.loadDemandData(attestKey, projectName, targets, dates)
       .then(function (gridData) {
         root.removeChild(loadingEl);
         components.renderSiteTable(tableContainer, gridData);
@@ -83,9 +101,9 @@ window.earlhamHWTable = window.earlhamHWTable || {};
         root.removeChild(loadingEl);
         var errEl = document.createElement('div');
         errEl.className   = 'hw-table-error';
-        errEl.textContent = 'Error loading sites: ' + err.message;
+        errEl.textContent = 'Error loading data: ' + err.message;
         root.appendChild(errEl);
-        console.error('[earlhamHWTable] Error loading sites:', err);
+        console.error('[earlhamHWTable] Error:', err);
       });
   };
 
