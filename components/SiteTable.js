@@ -2,6 +2,10 @@
 // Renders the demand data grid as a dynamic multi-column table.
 // Columns and their display names are driven by grid metadata.
 // Columns with a {hidden} marker in their meta are skipped.
+//
+// Special column meta recognised by this renderer:
+//   total          {marker}  — include this column in the totals footer row
+//   highlightAbove {Number}  — highlight cells whose value exceeds this number in red
 
 window.earlhamHWTable = window.earlhamHWTable || {};
 window.earlhamHWTable.components = window.earlhamHWTable.components || {};
@@ -9,25 +13,25 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
 (function (components) {
   var utils = window.earlhamHWTable.utils;
 
-  // Column whose cells get red-highlighted when the value exceeds the threshold
-  var THRESHOLD_COL = 'Max Measured Load Vs. Campus Average Building (%)';
-  var THRESHOLD_VAL = 200;
-
-  // Column display names (or substrings) that receive a numeric total in the footer
-  function shouldTotal(dis) {
-    if (!dis) return false;
-    if (dis.indexOf('Building Area') >= 0) return true;
-    if (dis === 'Measured Max Load (MBH)') return true;
-    if (dis === 'Estimated Maximum Load (MBH)') return true;
-    if (dis.indexOf('Measured Max Flow') >= 0) return true;
-    if (dis.indexOf('Predicted Max Flow') >= 0) return true;
-    return false;
-  }
-
   /** Returns true if a column's meta carries the {hidden} marker. */
   function isHidden(colMeta) {
     if (!colMeta) return false;
     return colMeta.hidden && colMeta.hidden._kind === 'marker';
+  }
+
+  /** Returns true if a column's meta carries the {total} marker. */
+  function hasTotal(colMeta) {
+    if (!colMeta) return false;
+    return colMeta.total && colMeta.total._kind === 'marker';
+  }
+
+  /**
+   * Returns the numeric threshold for red-highlighting from col meta, or null.
+   * Reads col.meta.highlightAbove (Haystack Number or plain JS number).
+   */
+  function getHighlightAbove(colMeta) {
+    if (!colMeta || colMeta.highlightAbove === undefined || colMeta.highlightAbove === null) return null;
+    return numericVal(colMeta.highlightAbove);
   }
 
   /** Extract the raw JS number from a Haystack cell value, or null. */
@@ -75,6 +79,14 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
       return !isHidden(col.meta);
     });
 
+    // Diagnostic: log column names and their dis values
+    console.log('[earlhamHWTable] Visible columns:',
+      visibleCols.map(function (col) {
+        return col.name + ' -> "' + ((col.meta && col.meta.dis) || '(no dis)') + '"' +
+               (hasTotal(col.meta) ? ' [total]' : '') +
+               (getHighlightAbove(col.meta) !== null ? ' [highlightAbove:' + getHighlightAbove(col.meta) + ']' : '');
+      }));
+
     var table = document.createElement('table');
     table.className = 'hw-site-table';
 
@@ -90,12 +102,12 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     table.appendChild(thead);
 
     // ── Body ─────────────────────────────────────────────────────────────────
-    var tbody = document.createElement('tbody');
-
-    // Pre-initialize totals accumulator for each totalable column
+    var tbody  = document.createElement('tbody');
     var totals = {};
+
+    // Pre-initialize totals accumulator for columns marked with {total}
     visibleCols.forEach(function (col) {
-      if (shouldTotal(col.meta && col.meta.dis)) totals[col.name] = 0;
+      if (hasTotal(col.meta)) totals[col.name] = 0;
     });
 
     if (rows.length === 0) {
@@ -109,25 +121,25 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
       rows.forEach(function (row) {
         var tr = document.createElement('tr');
         visibleCols.forEach(function (col) {
-          var td      = document.createElement('td');
-          var isIdCol = col.name === 'id';
-          var rawVal  = row[col.name];
-          var dis     = col.meta && col.meta.dis;
+          var td             = document.createElement('td');
+          var isIdCol        = col.name === 'id';
+          var rawVal         = row[col.name];
+          var highlightAbove = getHighlightAbove(col.meta);
 
           td.textContent = cellText(rawVal, isIdCol);
 
           var classes = [];
           if (!isIdCol) classes.push('hw-cell-number');
 
-          // Red highlight when % vs campus average exceeds threshold
-          if (dis === THRESHOLD_COL) {
+          // Red highlight when value exceeds the column's highlightAbove threshold
+          if (highlightAbove !== null) {
             var n = numericVal(rawVal);
-            if (n !== null && n > THRESHOLD_VAL) classes.push('hw-cell-above-threshold');
+            if (n !== null && n > highlightAbove) classes.push('hw-cell-above-threshold');
           }
 
           if (classes.length) td.className = classes.join(' ');
 
-          // Accumulate total
+          // Accumulate totals
           if (totals.hasOwnProperty(col.name)) {
             var nv = numericVal(rawVal);
             if (nv !== null) totals[col.name] += nv;
@@ -142,7 +154,7 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     table.appendChild(tbody);
 
     // ── Totals footer ─────────────────────────────────────────────────────────
-    if (rows.length > 0) {
+    if (rows.length > 0 && Object.keys(totals).length > 0) {
       var tfoot    = document.createElement('tfoot');
       var totalRow = document.createElement('tr');
 
