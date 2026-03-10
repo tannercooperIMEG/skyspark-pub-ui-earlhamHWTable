@@ -48,7 +48,7 @@
 #earlhamHWTable-root .hw-site-table td {
   border: 1px solid #000000;
   padding: 8px 12px;
-  text-align: left;
+  text-align: center;
 }
 
 /* Blue header with white text */
@@ -66,13 +66,37 @@
   color: #1a1a1a;
 }
 
-/* Right-align numeric value cells */
+/* Center numeric cells with tabular digits */
 #earlhamHWTable-root .hw-site-table tbody td.hw-cell-number {
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* Red highlight: % vs campus average > 200% */
+#earlhamHWTable-root .hw-site-table tbody td.hw-cell-above-threshold {
+  background-color: #ef4444;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 /* Subtle hover highlight */
 #earlhamHWTable-root .hw-site-table tbody tr:hover {
   background-color: #eef2ff;
+}
+
+/* ── Totals footer ─────────────────────────────────────────── */
+
+#earlhamHWTable-root .hw-site-table tfoot tr {
+  background-color: #1a56db;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+#earlhamHWTable-root .hw-site-table tfoot td {
+  border-top: 2px solid #000000;
+}
+
+#earlhamHWTable-root .hw-site-table tfoot td.hw-total-value {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
