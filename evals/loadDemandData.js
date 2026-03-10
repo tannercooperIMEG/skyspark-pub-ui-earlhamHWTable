@@ -24,9 +24,19 @@ window.earlhamHWTable.evals = window.earlhamHWTable.evals || {};
    */
   evals.loadDemandData = function (attestKey, projectName, targets, dates) {
     var axon = 'report_demandValCalcs_allSites(' + targets + ', ' + dates + ')';
+    console.log('[earlhamHWTable] Eval:', axon);
     return utils.evalAxon(axon, attestKey, projectName)
       .then(function (data) {
-        return utils.unwrapGrid(data);
+        console.log('[earlhamHWTable] Raw response:', JSON.stringify(data));
+        var grid = utils.unwrapGrid(data);
+        // SkySpark returns error grids with {err} in meta instead of throwing
+        if (grid.meta && grid.meta.err) {
+          var msg = (grid.meta.dis) ? String(grid.meta.dis) : 'SkySpark returned an error grid';
+          throw new Error(msg);
+        }
+        console.log('[earlhamHWTable] Grid cols:', (grid.cols || []).map(function(c){return c.name;}),
+                    '| rows:', (grid.rows || []).length);
+        return grid;
       });
   };
 

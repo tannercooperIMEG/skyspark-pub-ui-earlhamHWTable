@@ -70,8 +70,13 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     // ── View variables ───────────────────────────────────────────────────────
     // targets: equipment set ref (e.g. "@nav:equip.all")
     // dates:   date range expression (e.g. "pastMonth" or "2025-01-01..2025-01-31")
-    var targets = tryReadVar(view, 'targets') || tryReadVar(view.parent(), 'targets') || '@nav:equip.all';
-    var dates   = tryReadVar(view, 'dates')   || tryReadVar(view.parent(), 'dates')   || 'pastMonth';
+    var parentView = null;
+    try { parentView = view.parent(); } catch (e) {}
+
+    var targets = tryReadVar(view, 'targets') || (parentView && tryReadVar(parentView, 'targets')) || '@nav:equip.all';
+    var dates   = tryReadVar(view, 'dates')   || (parentView && tryReadVar(parentView, 'dates'))   || 'pastMonth';
+
+    console.log('[earlhamHWTable] targets:', targets, '| dates:', dates);
 
     // ── DOM scaffold ─────────────────────────────────────────────────────────
     var root = document.createElement('div');
