@@ -101,6 +101,44 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     return String(utils.extractValue(val) || '\u2014');
   }
 
+  // ── Tooltip portal ────────────────────────────────────────────────────────
+  // Appended to document.body so it escapes sticky-header stacking contexts
+  // and overflow:auto/hidden on scroll wrappers.
+  var _tooltipPortal = null;
+
+  function getTooltipPortal() {
+    if (_tooltipPortal) return _tooltipPortal;
+    _tooltipPortal = document.createElement('div');
+    _tooltipPortal.className = 'hw-tooltip-portal';
+    _tooltipPortal.style.display = 'none';
+    document.body.appendChild(_tooltipPortal);
+    return _tooltipPortal;
+  }
+
+  function showTooltip(text, anchor) {
+    var tip = getTooltipPortal();
+    tip.textContent = text;
+    tip.style.visibility = 'hidden';
+    tip.style.display = 'block';
+
+    var rect     = anchor.getBoundingClientRect();
+    var tipW     = tip.offsetWidth  || 210;
+    var tipH     = tip.offsetHeight || 40;
+    var left     = rect.left + rect.width / 2 - tipW / 2;
+    left = Math.max(4, Math.min(left, window.innerWidth - tipW - 4));
+    var top      = rect.top - tipH - 10;
+    if (top < 4) top = rect.bottom + 10; // fallback: open below if no room above
+
+    tip.style.left       = left + 'px';
+    tip.style.top        = top  + 'px';
+    tip.style.visibility = 'visible';
+  }
+
+  function hideTooltip() {
+    if (_tooltipPortal) _tooltipPortal.style.display = 'none';
+  }
+  // ── End tooltip portal ────────────────────────────────────────────────────
+
   // Display labels for the campus-wide KPI cards, keyed by totals-grid column name.
   var KPI_LABELS = {
     totalMeasuredMaxLoad:      'Measured Peak Load',
@@ -155,36 +193,48 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
   // Remove once report_demandValCalcs_allSites returns real markers.
   // Keys are column names; values mirror what Axon meta will eventually provide.
   var PLACEHOLDER_META = {
+    id: {
+      dis: 'Site'
+    },
     percOfCampusSF: {
+      dis: 'Campus SF %',
       doc: 'This building\'s conditioned area as a percentage of total campus square footage.'
     },
     point1: {
+      dis: 'Peak Demand',
       total: true,
       emphasis: true,
       doc: '95th-percentile measured hot water demand over the selected date range.'
     },
     point1BtuPerSF: {
+      dis: 'MBH / SF',
       doc: 'Measured peak load normalized by building area (MBH per ft²).'
     },
     avgBtuperSF: {
+      dis: 'Campus Avg MBH/SF',
       doc: 'Campus-wide average of each building\'s measured peak load per square foot.'
     },
     maxMeasuredLoadVsAvgBldg: {
+      dis: 'vs Avg Bldg',
       doc: 'How this building\'s peak load compares to the campus average building (100% = average).'
     },
     estMaxLoad: {
+      dis: 'Est. Max Load',
       total: true,
       doc: 'Estimated design-day maximum load based on building area and system type.'
     },
     measuredVsMaxLoad: {
+      dis: 'Meas. / Est.',
       doc: 'Measured peak as a percentage of estimated maximum — indicates how hard the system was pushed.'
     },
     point2: {
+      dis: 'Peak Flow',
       total: true,
       emphasis: true,
       doc: '95th-percentile measured hot water flow rate over the selected date range.'
     },
     predictedMaxHwFlow: {
+      dis: 'Pred. Max Flow',
       total: true,
       doc: 'Predicted maximum flow derived from estimated max load and design delta-T.'
     }
@@ -265,17 +315,20 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
       var docText   = (col.meta && typeof col.meta.doc === 'string') ? col.meta.doc : null;
 
       if (docText) {
-        // Label text node followed by an ⓘ icon with a tooltip
+        // Label text node followed by an ⓘ icon wired to the body-level portal tooltip
         th.appendChild(document.createTextNode(labelText));
 
         var infoWrap = document.createElement('span');
         infoWrap.className = 'hw-col-info';
         infoWrap.appendChild(document.createTextNode('\u24d8')); // ⓘ
 
-        var tooltipEl = document.createElement('span');
-        tooltipEl.className = 'hw-col-tooltip';
-        tooltipEl.textContent = docText;
-        infoWrap.appendChild(tooltipEl);
+        // Immediately-invoked closure captures docText per column
+        (function (text) {
+          infoWrap.addEventListener('mouseenter', function (e) {
+            showTooltip(text, e.currentTarget);
+          });
+          infoWrap.addEventListener('mouseleave', hideTooltip);
+        })(docText);
 
         th.appendChild(infoWrap);
       } else {

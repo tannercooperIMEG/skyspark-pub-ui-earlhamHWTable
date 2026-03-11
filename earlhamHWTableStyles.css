@@ -145,10 +145,11 @@
   font-weight: 600;
 }
 
-/* ── Column info tooltip (ⓘ icon in header) ─────────────── */
+/* ── Column info icon (ⓘ in header) ─────────────────────── */
+/* Tooltip is rendered via a JS portal appended to <body>;  */
+/* no CSS hover logic needed here.                          */
 
 #earlhamHWTable-root .hw-col-info {
-  position: relative;
   display: inline-block;
   margin-left: 5px;
   cursor: help;
@@ -165,41 +166,35 @@
   opacity: 1;
 }
 
-#earlhamHWTable-root .hw-col-info .hw-col-tooltip {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 8px);  /* open upward — above the sticky header */
-  left: 50%;
-  transform: translateX(-50%);
+/* ── Portal tooltip (appended to <body> by SiteTable.js) ── */
+/* position:fixed escapes every stacking context and         */
+/* overflow:auto/hidden container.                           */
+
+.hw-tooltip-portal {
+  position: fixed;
   background: #1a1a1a;
   color: #ffffff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
   font-size: 11px;
   font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
   line-height: 1.45;
   padding: 7px 10px;
   border-radius: 4px;
-  white-space: normal;
   width: 210px;
   z-index: 9999;
   pointer-events: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  white-space: normal;
 }
 
-/* Downward-pointing arrow (tooltip is above the icon) */
-#earlhamHWTable-root .hw-col-info .hw-col-tooltip::before {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: #1a1a1a;
-}
+/* ── Table container — flex child holding KPI strip + scroll wrapper ── */
 
-#earlhamHWTable-root .hw-col-info:hover .hw-col-tooltip {
-  display: block;
+#earlhamHWTable-root .hw-table-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;    /* critical: lets a flex child shrink below its content size */
+  overflow: hidden;
 }
 
 /* ── Data rows — alternating stripes ─────────────────────── */

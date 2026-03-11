@@ -6,6 +6,13 @@
 // At startup this file exposes window.earlhamHWTableApp, which the entry
 // file delegates to. The name MUST differ from the entry file's jsHandler
 // global ("earlhamHWTableHandler") to avoid collision.
+//
+// Re-render behaviour:
+//   onUpdate is called by SkySpark on every view refresh (including variable
+//   changes). The handler compares current targets/dates against the values
+//   stored on the root element; it only re-fetches when they differ.
+//   A fetch-generation counter ensures stale in-flight responses are discarded
+//   if variables change again before the first request completes.
 
 window.earlhamHWTable = window.earlhamHWTable || {};
 
@@ -17,6 +24,10 @@ window.earlhamHWTable = window.earlhamHWTable || {};
   var APP_ID   = 'earlhamHWTable-root';
   var CSS_ID   = 'earlhamHWTable-styles';
   var CSS_PATH = '/pub/ui/earlhamHWTable/earlhamHWTableStyles.css';
+
+  // Incremented on every new fetch; callbacks compare against this to discard
+  // responses that were superseded by a later variable change.
+  var _fetchGen = 0;
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
@@ -42,19 +53,48 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     return null;
   }
 
+  /**
+   * Clear tableContainer, show a loading indicator, fetch data, then render.
+   * Uses a generation counter so stale responses from superseded fetches are
+   * silently discarded.
+   */
+  function refreshData(tableContainer, attestKey, projectName, targets, dates) {
+    var gen = ++_fetchGen;
+
+    tableContainer.innerHTML = '';
+    var loadingEl = document.createElement('div');
+    loadingEl.className   = 'hw-table-loading';
+    loadingEl.textContent = 'Loading\u2026';
+    tableContainer.appendChild(loadingEl);
+
+    evals.loadDemandData(attestKey, projectName, targets, dates)
+      .then(function (result) {
+        if (gen !== _fetchGen) return; // superseded — discard
+        tableContainer.removeChild(loadingEl);
+        components.renderSiteTable(tableContainer, result.siteGrid, result.totalsGrid);
+      })
+      .catch(function (err) {
+        if (gen !== _fetchGen) return;
+        tableContainer.removeChild(loadingEl);
+        var errEl = document.createElement('div');
+        errEl.className   = 'hw-table-error';
+        errEl.textContent = 'Error loading data: ' + err.message;
+        tableContainer.appendChild(errEl);
+        console.error('[earlhamHWTable] Error:', err);
+      });
+  }
+
   // ── Public handler ─────────────────────────────────────────────────────────
 
   /**
    * Entry point called by SkySpark (via the entry file stub) on each view update.
+   * Called on first load and whenever any view variable changes.
    *
    * @param {Object} arg - SkySpark view argument ({ view, elem })
    */
   app.onUpdate = function (arg) {
     var view = arg.view;
     var elem = arg.elem;
-
-    // Prevent duplicate initialization on re-render
-    if (elem.querySelector('#' + APP_ID)) return;
 
     loadStyles();
 
@@ -76,11 +116,29 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     var targets = tryReadVar(view, 'targets') || (parentView && tryReadVar(parentView, 'targets')) || '@nav:equip.all';
     var dates   = tryReadVar(view, 'dates')   || (parentView && tryReadVar(parentView, 'dates'))   || 'pastMonth';
 
-    console.log('[earlhamHWTable] targets:', targets, '| dates:', dates);
+    console.log('[earlhamHWTable] onUpdate — targets:', targets, '| dates:', dates);
 
-    // ── DOM scaffold ─────────────────────────────────────────────────────────
-    var root = document.createElement('div');
-    root.id  = APP_ID;
+    var root = elem.querySelector('#' + APP_ID);
+
+    if (root) {
+      // ── Subsequent call — check if variables changed ──────────────────────
+      if (root.getAttribute('data-targets') === targets &&
+          root.getAttribute('data-dates')   === dates) {
+        return; // nothing changed; skip redundant fetch
+      }
+      console.log('[earlhamHWTable] Variables changed — re-fetching data.');
+      root.setAttribute('data-targets', targets);
+      root.setAttribute('data-dates',   dates);
+      refreshData(root.querySelector('.hw-table-container'),
+                  attestKey, projectName, targets, dates);
+      return;
+    }
+
+    // ── First render — build DOM scaffold ────────────────────────────────────
+    root    = document.createElement('div');
+    root.id = APP_ID;
+    root.setAttribute('data-targets', targets);
+    root.setAttribute('data-dates',   dates);
     elem.appendChild(root);
 
     var title = document.createElement('div');
@@ -88,28 +146,11 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     title.textContent = 'Hot Water Meter \u2014 95% Demand Values';
     root.appendChild(title);
 
-    var loadingEl = document.createElement('div');
-    loadingEl.className   = 'hw-table-loading';
-    loadingEl.textContent = 'Loading\u2026';
-    root.appendChild(loadingEl);
-
     var tableContainer = document.createElement('div');
+    tableContainer.className = 'hw-table-container';
     root.appendChild(tableContainer);
 
-    // ── Data fetch \u2192 render ───────────────────────────────────────────────────
-    evals.loadDemandData(attestKey, projectName, targets, dates)
-      .then(function (result) {
-        root.removeChild(loadingEl);
-        components.renderSiteTable(tableContainer, result.siteGrid, result.totalsGrid);
-      })
-      .catch(function (err) {
-        root.removeChild(loadingEl);
-        var errEl = document.createElement('div');
-        errEl.className   = 'hw-table-error';
-        errEl.textContent = 'Error loading data: ' + err.message;
-        root.appendChild(errEl);
-        console.error('[earlhamHWTable] Error:', err);
-      });
+    refreshData(tableContainer, attestKey, projectName, targets, dates);
   };
 
 })(window.earlhamHWTable);
