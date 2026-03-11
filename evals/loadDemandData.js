@@ -1,5 +1,6 @@
 // earlhamHWTable/evals/loadDemandData.js
-// Axon eval wrapper — fetches 95th-percentile HW demand values for all sites
+// Axon eval wrapper — fetches 95th-percentile HW demand values for all sites,
+// plus the pre-calculated campus-wide totals row (mode 2).
 
 window.earlhamHWTable = window.earlhamHWTable || {};
 window.earlhamHWTable.evals = window.earlhamHWTable.evals || {};
@@ -8,36 +9,60 @@ window.earlhamHWTable.evals = window.earlhamHWTable.evals || {};
   var utils = window.earlhamHWTable.utils;
 
   /**
-   * Fetch hot water demand stats for all sites using the report function.
+   * Unwrap and validate a grid returned from evalAxon.
+   * Throws if the response is a SkySpark error grid.
    *
-   * Axon: report_demandValCalcs_allSites(targets, dates)
+   * @param {Object} data - Raw JSON response
+   * @param {string} label - Label used in error/log messages
+   * @returns {Object} Unwrapped Haystack grid
+   */
+  function unwrapAndCheck(data, label) {
+    var grid = utils.unwrapGrid(data);
+    if (grid.meta && grid.meta.err) {
+      var msg = (grid.meta.dis) ? String(grid.meta.dis) : 'SkySpark returned an error grid';
+      throw new Error('[' + label + '] ' + msg);
+    }
+    return grid;
+  }
+
+  /**
+   * Fetch hot water demand stats for all sites.
    *
-   * Returns a grid with columns: id (Site ref), point1 (HW Demand),
-   * point2 (HW Flow), point3 (HW RT - hidden), point4 (HW ST - hidden).
-   * Hidden columns carry a {hidden} marker in their col meta.
+   * Makes two parallel eval calls:
+   *   1. report_demandValCalcs_allSites(targets, dates)
+   *      → per-site detail rows
+   *   2. report_demandValCalcs_allSites(targets, dates, 2)
+   *      → single-row campus totals grid with columns:
+   *        totalMeasuredMaxLoad, totalEstimatedMaximumLoad,
+   *        totalActualHwFlow, totalEstimatedHwFlow
    *
    * @param {string} attestKey   - Session attest key
    * @param {string} projectName - SkySpark project name
-   * @param {string} targets     - Axon expression for equipment set (e.g. "@nav:equip.all")
-   * @param {string} dates       - Axon expression for date range (e.g. "pastMonth")
-   * @returns {Promise<Object>}  - Haystack grid
+   * @param {string} targets     - Axon expression for equipment set
+   * @param {string} dates       - Axon expression for date range
+   * @returns {Promise<{siteGrid: Object, totalsGrid: Object}>}
    */
   evals.loadDemandData = function (attestKey, projectName, targets, dates) {
-    var axon = 'report_demandValCalcs_allSites(' + targets + ', ' + dates + ')';
-    console.log('[earlhamHWTable] Eval:', axon);
-    return utils.evalAxon(axon, attestKey, projectName)
-      .then(function (data) {
-        var grid = utils.unwrapGrid(data);
-        // SkySpark returns error grids with {err} in meta instead of throwing
-        if (grid.meta && grid.meta.err) {
-          var msg = (grid.meta.dis) ? String(grid.meta.dis) : 'SkySpark returned an error grid';
-          throw new Error(msg);
-        }
-        console.log('[earlhamHWTable] Grid cols:', (grid.cols || []).map(function(c){return c.name;}),
-                    '| rows:', (grid.rows || []).length);
-        console.log('[earlhamHWTable] Col meta:', (grid.cols || []).map(function(c){return {name:c.name, meta:c.meta};}));
-        return grid;
-      });
+    var siteAxon   = 'report_demandValCalcs_allSites(' + targets + ', ' + dates + ')';
+    var totalsAxon = 'report_demandValCalcs_allSites(' + targets + ', ' + dates + ', 2)';
+
+    console.log('[earlhamHWTable] Eval (site):', siteAxon);
+    console.log('[earlhamHWTable] Eval (totals):', totalsAxon);
+
+    return Promise.all([
+      utils.evalAxon(siteAxon,   attestKey, projectName),
+      utils.evalAxon(totalsAxon, attestKey, projectName)
+    ]).then(function (results) {
+      var siteGrid   = unwrapAndCheck(results[0], 'siteGrid');
+      var totalsGrid = unwrapAndCheck(results[1], 'totalsGrid');
+
+      console.log('[earlhamHWTable] Site grid cols:',
+        (siteGrid.cols || []).map(function (c) { return c.name; }),
+        '| rows:', (siteGrid.rows || []).length);
+      console.log('[earlhamHWTable] Totals row:', totalsGrid.rows && totalsGrid.rows[0]);
+
+      return { siteGrid: siteGrid, totalsGrid: totalsGrid };
+    });
   };
 
 })(window.earlhamHWTable.evals);

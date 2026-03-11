@@ -101,42 +101,46 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     return String(utils.extractValue(val) || '\u2014');
   }
 
+  // Display labels for the campus-wide KPI cards, keyed by totals-grid column name.
+  var KPI_LABELS = {
+    totalMeasuredMaxLoad:      'Measured Peak Load',
+    totalEstimatedMaximumLoad: 'Estimated Max Load',
+    totalActualHwFlow:         'Actual HW Flow',
+    totalEstimatedHwFlow:      'Estimated HW Flow'
+  };
+
   /**
-   * Render KPI summary cards for all {total} columns above the table.
-   * Cards show campus-wide totals at a glance before the per-site detail.
+   * Render KPI summary cards from the pre-calculated campus totals grid
+   * (report_demandValCalcs_allSites called with mode 2).
    *
    * @param {HTMLElement} container   - Parent element to append the strip to
-   * @param {Array}       visibleCols - Filtered column definitions
-   * @param {Array}       rows        - Data rows from the grid
+   * @param {Object}      totalsGrid  - Single-row Haystack grid with campus totals
    */
-  function renderKpiCards(container, visibleCols, rows) {
-    var totalCols = visibleCols.filter(function (col) { return hasTotal(col.meta); });
-    if (!totalCols.length) return;
+  function renderKpiCards(container, totalsGrid) {
+    if (!totalsGrid || !totalsGrid.rows || !totalsGrid.rows.length) return;
 
-    // Sum each totaled column across all rows
-    var totals = {};
-    totalCols.forEach(function (col) { totals[col.name] = 0; });
-    rows.forEach(function (row) {
-      totalCols.forEach(function (col) {
-        var nv = parseNumericVal(row[col.name]);
-        if (nv !== null) totals[col.name] += nv;
-      });
-    });
+    var totalsRow = totalsGrid.rows[0];
+    var cols      = totalsGrid.cols || [];
+    if (!cols.length) return;
 
     var strip = document.createElement('div');
     strip.className = 'hw-kpi-strip';
 
-    totalCols.forEach(function (col) {
+    cols.forEach(function (col) {
+      var rawVal = totalsRow[col.name];
+      var nv     = parseNumericVal(rawVal);
+      if (nv === null) return;   // skip non-numeric columns
+
       var card = document.createElement('div');
       card.className = 'hw-kpi-card';
 
       var valueEl = document.createElement('div');
       valueEl.className = 'hw-kpi-value';
-      valueEl.textContent = totals[col.name].toLocaleString(undefined, { maximumFractionDigits: 0 });
+      valueEl.textContent = nv.toLocaleString(undefined, { maximumFractionDigits: 0 });
 
       var labelEl = document.createElement('div');
       labelEl.className = 'hw-kpi-label';
-      labelEl.textContent = (col.meta && col.meta.dis) ? col.meta.dis : col.name;
+      labelEl.textContent = KPI_LABELS[col.name] || col.name;
 
       card.appendChild(valueEl);
       card.appendChild(labelEl);
@@ -206,10 +210,11 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
   /**
    * Render the demand data grid into the given container element.
    *
-   * @param {HTMLElement} container - DOM element to render into
-   * @param {Object}      gridData  - Haystack grid returned by loadDemandData
+   * @param {HTMLElement} container   - DOM element to render into
+   * @param {Object}      gridData    - Per-site Haystack grid returned by loadDemandData
+   * @param {Object}      totalsGrid  - Campus totals grid (mode 2) for KPI cards
    */
-  components.renderSiteTable = function (container, gridData) {
+  components.renderSiteTable = function (container, gridData, totalsGrid) {
     container.innerHTML = '';
 
     var cols = gridData.cols || [];
@@ -237,9 +242,7 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
       }));
 
     // ── KPI cards (campus-wide totals strip) ─────────────────────────────────
-    if (rows.length > 0) {
-      renderKpiCards(container, visibleCols, rows);
-    }
+    renderKpiCards(container, totalsGrid);
 
     // ── Scrollable wrapper (title + KPI strip stay pinned above) ────────────
     var scrollWrapper = document.createElement('div');

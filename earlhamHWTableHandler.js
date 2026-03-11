@@ -98,9 +98,9 @@ window.earlhamHWTable = window.earlhamHWTable || {};
 
     // ── Data fetch \u2192 render ───────────────────────────────────────────────────
     evals.loadDemandData(attestKey, projectName, targets, dates)
-      .then(function (gridData) {
+      .then(function (result) {
         root.removeChild(loadingEl);
-        components.renderSiteTable(tableContainer, gridData);
+        components.renderSiteTable(tableContainer, result.siteGrid, result.totalsGrid);
       })
       .catch(function (err) {
         root.removeChild(loadingEl);
