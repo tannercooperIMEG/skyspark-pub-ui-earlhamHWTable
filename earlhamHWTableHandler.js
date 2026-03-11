@@ -7,7 +7,6 @@
 // file delegates to. The name MUST differ from the entry file's jsHandler
 // global ("earlhamHWTableHandler") to avoid collision.
 
-console.log('[earlhamHWTable] earlhamHWTableHandler.js executing...');
 window.earlhamHWTable = window.earlhamHWTable || {};
 
 (function (app) {

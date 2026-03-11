@@ -27,7 +27,6 @@ window.earlhamHWTable.evals = window.earlhamHWTable.evals || {};
     console.log('[earlhamHWTable] Eval:', axon);
     return utils.evalAxon(axon, attestKey, projectName)
       .then(function (data) {
-        console.log('[earlhamHWTable] Raw response:', JSON.stringify(data));
         var grid = utils.unwrapGrid(data);
         // SkySpark returns error grids with {err} in meta instead of throwing
         if (grid.meta && grid.meta.err) {
