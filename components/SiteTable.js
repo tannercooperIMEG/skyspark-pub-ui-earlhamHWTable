@@ -152,6 +152,60 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
    * @param {HTMLElement} container - DOM element to render into
    * @param {Object}      gridData  - Haystack grid returned by loadDemandData
    */
+  // ── PLACEHOLDER CONFIG ───────────────────────────────────────────────────
+  // Temporary: applied when Axon col meta doesn't carry {total} / doc yet.
+  // Remove once report_demandValCalcs_allSites returns real markers.
+  // Keys are column names; values mirror what Axon meta will eventually provide.
+  var PLACEHOLDER_META = {
+    percOfCampusSF: {
+      doc: 'This building\'s conditioned area as a percentage of total campus square footage.'
+    },
+    point1: {
+      total: true,
+      emphasis: true,
+      doc: '95th-percentile measured hot water demand over the selected date range.'
+    },
+    point1BtuPerSF: {
+      doc: 'Measured peak load normalized by building area (MBH per ft²).'
+    },
+    avgBtuperSF: {
+      doc: 'Campus-wide average of each building\'s measured peak load per square foot.'
+    },
+    maxMeasuredLoadVsAvgBldg: {
+      doc: 'How this building\'s peak load compares to the campus average building (100% = average).'
+    },
+    estMaxLoad: {
+      total: true,
+      doc: 'Estimated design-day maximum load based on building area and system type.'
+    },
+    measuredVsMaxLoad: {
+      doc: 'Measured peak as a percentage of estimated maximum — indicates how hard the system was pushed.'
+    },
+    point2: {
+      total: true,
+      emphasis: true,
+      doc: '95th-percentile measured hot water flow rate over the selected date range.'
+    },
+    predictedMaxHwFlow: {
+      total: true,
+      doc: 'Predicted maximum flow derived from estimated max load and design delta-T.'
+    }
+  };
+
+  // Fallback helpers — merge placeholder into actual meta when real markers absent
+  function effectiveMeta(col) {
+    var real = col.meta || {};
+    var ph   = PLACEHOLDER_META[col.name] || {};
+    return {
+      dis:      real.dis      || ph.dis,
+      doc:      real.doc      || ph.doc      || null,
+      total:    real.total    || (ph.total    ? { _kind: 'marker' } : undefined),
+      emphasis: real.emphasis || (ph.emphasis ? { _kind: 'marker' } : undefined),
+      hidden:   real.hidden
+    };
+  }
+  // ── END PLACEHOLDER CONFIG ───────────────────────────────────────────────
+
   components.renderSiteTable = function (container, gridData) {
     container.innerHTML = '';
 
@@ -160,6 +214,9 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
 
     var visibleCols = cols.filter(function (col) {
       return !isHidden(col.meta);
+    // Augment each visible col with effective (real + placeholder) meta
+    }).map(function (col) {
+      return { name: col.name, meta: effectiveMeta(col) };
     });
 
     // Build per-cell background color map from presentation metadata

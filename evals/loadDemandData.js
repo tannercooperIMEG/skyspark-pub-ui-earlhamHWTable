@@ -35,6 +35,7 @@ window.earlhamHWTable.evals = window.earlhamHWTable.evals || {};
         }
         console.log('[earlhamHWTable] Grid cols:', (grid.cols || []).map(function(c){return c.name;}),
                     '| rows:', (grid.rows || []).length);
+        console.log('[earlhamHWTable] Col meta:', (grid.cols || []).map(function(c){return {name:c.name, meta:c.meta};}));
         return grid;
       });
   };
