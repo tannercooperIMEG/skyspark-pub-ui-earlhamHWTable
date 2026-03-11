@@ -146,12 +146,6 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     container.appendChild(strip);
   }
 
-  /**
-   * Render the demand data grid into the given container element.
-   *
-   * @param {HTMLElement} container - DOM element to render into
-   * @param {Object}      gridData  - Haystack grid returned by loadDemandData
-   */
   // ── PLACEHOLDER CONFIG ───────────────────────────────────────────────────
   // Temporary: applied when Axon col meta doesn't carry {total} / doc yet.
   // Remove once report_demandValCalcs_allSites returns real markers.
@@ -192,29 +186,38 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     }
   };
 
-  // Fallback helpers — merge placeholder into actual meta when real markers absent
+  /** Produce a Haystack marker object — used by effectiveMeta to synthesize markers. */
+  function marker() { return { _kind: 'marker' }; }
+
+  /** Merge real Axon col meta with placeholder values; real meta always wins. */
   function effectiveMeta(col) {
     var real = col.meta || {};
     var ph   = PLACEHOLDER_META[col.name] || {};
     return {
       dis:      real.dis      || ph.dis,
       doc:      real.doc      || ph.doc      || null,
-      total:    real.total    || (ph.total    ? { _kind: 'marker' } : undefined),
-      emphasis: real.emphasis || (ph.emphasis ? { _kind: 'marker' } : undefined),
+      total:    real.total    || (ph.total    ? marker() : undefined),
+      emphasis: real.emphasis || (ph.emphasis ? marker() : undefined),
       hidden:   real.hidden
     };
   }
   // ── END PLACEHOLDER CONFIG ───────────────────────────────────────────────
 
+  /**
+   * Render the demand data grid into the given container element.
+   *
+   * @param {HTMLElement} container - DOM element to render into
+   * @param {Object}      gridData  - Haystack grid returned by loadDemandData
+   */
   components.renderSiteTable = function (container, gridData) {
     container.innerHTML = '';
 
     var cols = gridData.cols || [];
     var rows = gridData.rows || [];
 
+    // Filter hidden columns, then augment each col with effective (real + placeholder) meta
     var visibleCols = cols.filter(function (col) {
       return !isHidden(col.meta);
-    // Augment each visible col with effective (real + placeholder) meta
     }).map(function (col) {
       return { name: col.name, meta: effectiveMeta(col) };
     });
