@@ -1,14 +1,19 @@
 // earlhamHWTable/components/SiteTable.js
 // Renders the demand data grid as a dynamic multi-column table.
 // Columns and their display names are driven by grid metadata.
-// Columns with a {hidden} marker in their meta are skipped.
+//
+// Supported col meta markers / fields:
+//   {hidden}          — column is not rendered
+//   {total}           — column is summed; value appears in KPI cards above the table
+//   {emphasis}        — column header gets an orange accent, cells are bolded
+//   doc: "string"     — info icon (ⓘ) appears in header with a hover tooltip
 //
 // Cell background colors are read from gridData.meta.presentation, a sub-grid
 // with columns {col, row, background} that maps 0-based row indices and column
 // names to CSS color strings.
 //
-// Columns with a {total} marker in their col meta are summed in a footer row.
-// Both Haystack Number objects and pre-formatted strings ("1,667") are parsed.
+// Both Haystack Number objects and pre-formatted strings ("1,667") are parsed
+// for numeric operations (KPI totals).
 
 window.earlhamHWTable = window.earlhamHWTable || {};
 window.earlhamHWTable.components = window.earlhamHWTable.components || {};
@@ -26,6 +31,12 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
   function hasTotal(colMeta) {
     if (!colMeta) return false;
     return colMeta.total && colMeta.total._kind === 'marker';
+  }
+
+  /** Returns true if a column's meta carries the {emphasis} marker. */
+  function isEmphasis(colMeta) {
+    if (!colMeta) return false;
+    return colMeta.emphasis && colMeta.emphasis._kind === 'marker';
   }
 
   /**
@@ -91,6 +102,51 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
   }
 
   /**
+   * Render KPI summary cards for all {total} columns above the table.
+   * Cards show campus-wide totals at a glance before the per-site detail.
+   *
+   * @param {HTMLElement} container   - Parent element to append the strip to
+   * @param {Array}       visibleCols - Filtered column definitions
+   * @param {Array}       rows        - Data rows from the grid
+   */
+  function renderKpiCards(container, visibleCols, rows) {
+    var totalCols = visibleCols.filter(function (col) { return hasTotal(col.meta); });
+    if (!totalCols.length) return;
+
+    // Sum each totaled column across all rows
+    var totals = {};
+    totalCols.forEach(function (col) { totals[col.name] = 0; });
+    rows.forEach(function (row) {
+      totalCols.forEach(function (col) {
+        var nv = parseNumericVal(row[col.name]);
+        if (nv !== null) totals[col.name] += nv;
+      });
+    });
+
+    var strip = document.createElement('div');
+    strip.className = 'hw-kpi-strip';
+
+    totalCols.forEach(function (col) {
+      var card = document.createElement('div');
+      card.className = 'hw-kpi-card';
+
+      var valueEl = document.createElement('div');
+      valueEl.className = 'hw-kpi-value';
+      valueEl.textContent = totals[col.name].toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+      var labelEl = document.createElement('div');
+      labelEl.className = 'hw-kpi-label';
+      labelEl.textContent = (col.meta && col.meta.dis) ? col.meta.dis : col.name;
+
+      card.appendChild(valueEl);
+      card.appendChild(labelEl);
+      strip.appendChild(card);
+    });
+
+    container.appendChild(strip);
+  }
+
+  /**
    * Render the demand data grid into the given container element.
    *
    * @param {HTMLElement} container - DOM element to render into
@@ -109,38 +165,68 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
     // Build per-cell background color map from presentation metadata
     var cellColors = buildCellColors(gridData);
 
-    // Diagnostic: log visible columns and any presentation entries
+    // Diagnostic: log visible columns and active meta flags
     console.log('[earlhamHWTable] Visible columns:',
       visibleCols.map(function (col) {
+        var flags = [];
+        if (hasTotal(col.meta))           flags.push('total');
+        if (isEmphasis(col.meta))         flags.push('emphasis');
+        if (col.meta && col.meta.doc)     flags.push('doc');
         return col.name + ':' + ((col.meta && col.meta.dis) || '?') +
-               (hasTotal(col.meta) ? ' [total]' : '');
+               (flags.length ? ' [' + flags.join(',') + ']' : '');
       }));
-    if (Object.keys(cellColors).length) {
-      console.log('[earlhamHWTable] Presentation cell colors:', cellColors);
+
+    // ── KPI cards (campus-wide totals strip) ─────────────────────────────────
+    if (rows.length > 0) {
+      renderKpiCards(container, visibleCols, rows);
     }
+
+    // ── Scrollable wrapper (title + KPI strip stay pinned above) ────────────
+    var scrollWrapper = document.createElement('div');
+    scrollWrapper.className = 'hw-table-scroll-wrapper';
+    container.appendChild(scrollWrapper);
 
     var table = document.createElement('table');
     table.className = 'hw-site-table';
+    scrollWrapper.appendChild(table);
 
     // ── Header ───────────────────────────────────────────────────────────────
     var thead     = document.createElement('thead');
     var headerRow = document.createElement('tr');
+
     visibleCols.forEach(function (col) {
       var th = document.createElement('th');
-      th.textContent = (col.meta && col.meta.dis) ? col.meta.dis : col.name;
+      if (isEmphasis(col.meta)) th.className = 'hw-col-emphasis';
+
+      var labelText = (col.meta && col.meta.dis) ? col.meta.dis : col.name;
+      var docText   = (col.meta && typeof col.meta.doc === 'string') ? col.meta.doc : null;
+
+      if (docText) {
+        // Label text node followed by an ⓘ icon with a tooltip
+        th.appendChild(document.createTextNode(labelText));
+
+        var infoWrap = document.createElement('span');
+        infoWrap.className = 'hw-col-info';
+        infoWrap.appendChild(document.createTextNode('\u24d8')); // ⓘ
+
+        var tooltipEl = document.createElement('span');
+        tooltipEl.className = 'hw-col-tooltip';
+        tooltipEl.textContent = docText;
+        infoWrap.appendChild(tooltipEl);
+
+        th.appendChild(infoWrap);
+      } else {
+        th.textContent = labelText;
+      }
+
       headerRow.appendChild(th);
     });
+
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
     // ── Body ─────────────────────────────────────────────────────────────────
-    var tbody  = document.createElement('tbody');
-    var totals = {};
-
-    // Pre-initialize totals accumulator for columns marked with {total}
-    visibleCols.forEach(function (col) {
-      if (hasTotal(col.meta)) totals[col.name] = 0;
-    });
+    var tbody = document.createElement('tbody');
 
     if (rows.length === 0) {
       var emptyRow  = document.createElement('tr');
@@ -159,20 +245,19 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
           var rawVal  = row[col.name];
 
           td.textContent = cellText(rawVal, isIdCol);
-          if (!isIdCol) td.className = 'hw-cell-number';
 
-          // Apply background color from presentation grid (no JS threshold logic)
+          // Build CSS class list
+          var classes = [];
+          if (!isIdCol)             classes.push('hw-cell-number');
+          if (isEmphasis(col.meta)) classes.push('hw-col-emphasis-cell');
+          if (classes.length) td.className = classes.join(' ');
+
+          // Apply background color from presentation grid
           var bgColor = cellColors[rowIdx] && cellColors[rowIdx][col.name];
           if (bgColor) {
             td.style.backgroundColor = bgColor;
             td.style.color           = '#ffffff';
             td.style.fontWeight      = '700';
-          }
-
-          // Accumulate totals — parses both Haystack Numbers and "1,667" strings
-          if (totals.hasOwnProperty(col.name)) {
-            var nv = parseNumericVal(rawVal);
-            if (nv !== null) totals[col.name] += nv;
           }
 
           tr.appendChild(td);
@@ -184,32 +269,8 @@ window.earlhamHWTable.components = window.earlhamHWTable.components || {};
 
     table.appendChild(tbody);
 
-    // ── Totals footer ─────────────────────────────────────────────────────────
-    if (rows.length > 0 && Object.keys(totals).length > 0) {
-      var tfoot    = document.createElement('tfoot');
-      var totalRow = document.createElement('tr');
-
-      visibleCols.forEach(function (col, idx) {
-        var td = document.createElement('td');
-
-        if (idx === 0) {
-          td.textContent = 'Total';
-          td.className   = 'hw-total-label';
-        } else if (totals.hasOwnProperty(col.name)) {
-          td.textContent = totals[col.name].toLocaleString(undefined, { maximumFractionDigits: 0 });
-          td.className   = 'hw-cell-number hw-total-value';
-        } else {
-          td.textContent = '';
-        }
-
-        totalRow.appendChild(td);
-      });
-
-      tfoot.appendChild(totalRow);
-      table.appendChild(tfoot);
-    }
-
-    container.appendChild(table);
+    // Note: totals are displayed as KPI cards above the table.
+    // The tfoot CSS rules remain available for optional use.
   };
 
 })(window.earlhamHWTable.components);
