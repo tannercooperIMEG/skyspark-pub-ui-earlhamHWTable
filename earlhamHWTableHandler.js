@@ -9,10 +9,9 @@
 //
 // Re-render behaviour:
 //   onUpdate is called by SkySpark on every view refresh (including variable
-//   changes). The handler compares current targets/dates against the values
-//   stored on the root element; it only re-fetches when they differ.
-//   A fetch-generation counter ensures stale in-flight responses are discarded
-//   if variables change again before the first request completes.
+//   changes). The DOM scaffold is built once; refreshData is called on every
+//   onUpdate so variable changes always trigger a new fetch. A fetch-generation
+//   counter ensures stale in-flight responses are silently discarded.
 
 window.earlhamHWTable = window.earlhamHWTable || {};
 
@@ -90,6 +89,11 @@ window.earlhamHWTable = window.earlhamHWTable || {};
    * Entry point called by SkySpark (via the entry file stub) on each view update.
    * Called on first load and whenever any view variable changes.
    *
+   * The scaffold (title + tableContainer) is built once on the first call.
+   * refreshData is called on every onUpdate so that variable changes always
+   * trigger a re-fetch. The _fetchGen counter in refreshData discards any
+   * in-flight responses that were superseded by a later call.
+   *
    * @param {Object} arg - SkySpark view argument ({ view, elem })
    */
   app.onUpdate = function (arg) {
@@ -118,37 +122,26 @@ window.earlhamHWTable = window.earlhamHWTable || {};
 
     console.log('[earlhamHWTable] onUpdate — targets:', targets, '| dates:', dates);
 
+    // ── Build scaffold once, then always refresh data ─────────────────────────
     var root = elem.querySelector('#' + APP_ID);
+    var tableContainer;
 
-    if (root) {
-      // ── Subsequent call — check if variables changed ──────────────────────
-      if (root.getAttribute('data-targets') === targets &&
-          root.getAttribute('data-dates')   === dates) {
-        return; // nothing changed; skip redundant fetch
-      }
-      console.log('[earlhamHWTable] Variables changed — re-fetching data.');
-      root.setAttribute('data-targets', targets);
-      root.setAttribute('data-dates',   dates);
-      refreshData(root.querySelector('.hw-table-container'),
-                  attestKey, projectName, targets, dates);
-      return;
+    if (!root) {
+      root    = document.createElement('div');
+      root.id = APP_ID;
+      elem.appendChild(root);
+
+      var title = document.createElement('div');
+      title.className   = 'hw-table-title';
+      title.textContent = 'Hot Water Meter \u2014 95% Demand Values';
+      root.appendChild(title);
+
+      tableContainer = document.createElement('div');
+      tableContainer.className = 'hw-table-container';
+      root.appendChild(tableContainer);
+    } else {
+      tableContainer = root.querySelector('.hw-table-container');
     }
-
-    // ── First render — build DOM scaffold ────────────────────────────────────
-    root    = document.createElement('div');
-    root.id = APP_ID;
-    root.setAttribute('data-targets', targets);
-    root.setAttribute('data-dates',   dates);
-    elem.appendChild(root);
-
-    var title = document.createElement('div');
-    title.className   = 'hw-table-title';
-    title.textContent = 'Hot Water Meter \u2014 95% Demand Values';
-    root.appendChild(title);
-
-    var tableContainer = document.createElement('div');
-    tableContainer.className = 'hw-table-container';
-    root.appendChild(tableContainer);
 
     refreshData(tableContainer, attestKey, projectName, targets, dates);
   };
