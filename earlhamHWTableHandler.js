@@ -43,14 +43,28 @@ window.earlhamHWTable = window.earlhamHWTable || {};
   /**
    * Read a named VarNode from the SkySpark view using view.var(name).
    * Returns the Axon string representation, or null if not set.
+   *
+   * Fantom proxy objects don't always expose toAxon/toStr, so we also
+   * pattern-match the String() output to fix up common Fantom formats:
+   *   Ref:      [nav:equip.all]          → @nav:equip.all
+   *   DateSpan: 2026-02-01,2026-03-01   → 2026-02-01..2026-03-01
    */
   function tryReadVar(view, varName) {
     try {
       var val = view.var(varName);
       if (val == null) return null;
-      if (val.toAxon) return val.toAxon();   // Ref → "@nav:equip.all"
-      if (val.toStr)  return val.toStr();
-      return String(val);
+      if (typeof val.toAxon === 'function') return val.toAxon();
+      if (typeof val.toStr  === 'function') return val.toStr();
+      var s = String(val);
+      // Fantom Ref display format: [nav:equip.all] → @nav:equip.all
+      if (s.charAt(0) === '[' && s.charAt(s.length - 1) === ']') {
+        return '@' + s.slice(1, -1);
+      }
+      // Fantom DateSpan comma format: 2026-02-01,2026-03-01 → 2026-02-01..2026-03-01
+      if (/^\d{4}-\d{2}-\d{2},\d{4}-\d{2}-\d{2}$/.test(s)) {
+        return s.replace(',', '..');
+      }
+      return s;
     } catch (e) { /* variable not set or not found */ }
     return null;
   }
