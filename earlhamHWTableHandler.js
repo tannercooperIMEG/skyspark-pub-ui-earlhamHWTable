@@ -130,13 +130,13 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     if (!window._hwTableDiagDone) {
       window._hwTableDiagDone = true;
       try {
-        console.log('[HW DIAG] arg keys:', Object.keys(arg || {}));
+        console.log('[earlhamHWTable DIAG] arg keys:', Object.keys(arg || {}));
         var proto = Object.getPrototypeOf(view);
-        console.log('[HW DIAG] view proto methods:',
+        console.log('[earlhamHWTable DIAG] view proto methods:',
           Object.getOwnPropertyNames(proto || {}).filter(function(k){ return k !== 'constructor'; }));
         var tryGet = function(label, fn) {
-          try { var v = fn(); console.log('[HW DIAG]', label, '->', v); }
-          catch(e) { console.log('[HW DIAG]', label, 'threw:', e.message); }
+          try { var v = fn(); console.log('[earlhamHWTable DIAG]', label, '->', v); }
+          catch(e) { console.log('[earlhamHWTable DIAG]', label, 'threw:', e.message); }
         };
         tryGet('view.rec',         function(){ return view.rec; });
         tryGet('view.model',       function(){ return view.model; });
@@ -150,13 +150,13 @@ window.earlhamHWTable = window.earlhamHWTable || {};
         tryGet('arg.ctx',          function(){ return arg.ctx; });
         var sess = view.session();
         var sessProto = Object.getPrototypeOf(sess);
-        console.log('[HW DIAG] session proto methods:',
+        console.log('[earlhamHWTable DIAG] session proto methods:',
           Object.getOwnPropertyNames(sessProto || {}).filter(function(k){ return k !== 'constructor'; }));
         tryGet('session.nav()',    function(){ return sess.nav(); });
         tryGet('session.ctx()',    function(){ return sess.ctx(); });
         tryGet('session.dates()',  function(){ return sess.dates(); });
       } catch(diagErr) {
-        console.log('[HW DIAG] diagnostic threw:', diagErr.message);
+        console.log('[earlhamHWTable DIAG] diagnostic threw:', diagErr.message);
       }
     }
     // ── End diagnostic ────────────────────────────────────────────────────────
