@@ -130,48 +130,82 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     if (!window._hwTableDiagDone) {
       window._hwTableDiagDone = true;
       try {
+        // ── arg keys (with typeof) ──────────────────────────────────────────
         var argKeys = Object.keys(arg || {});
         console.log('[earlhamHWTable DIAG] arg keys:', argKeys.join(', '));
 
-        // Log the value of every arg key (not just view/elem)
         argKeys.forEach(function(k) {
           if (k !== 'view' && k !== 'elem') {
-            try { console.log('[earlhamHWTable DIAG] arg.' + k + ' ->', arg[k]); }
-            catch(e) { console.log('[earlhamHWTable DIAG] arg.' + k + ' threw:', e.message); }
+            var v = arg[k];
+            var t = typeof v;
+            var extra = '';
+            if (t === 'object' && v !== null) {
+              try { extra = ' | obj-keys: ' + Object.keys(v).join(','); } catch(e) {}
+            }
+            console.log('[earlhamHWTable DIAG] arg.' + k, '| typeof:', t, extra);
           }
         });
 
+        // ── view own enumerable keys ────────────────────────────────────────
+        try {
+          var viewOwnKeys = Object.keys(view || {});
+          console.log('[earlhamHWTable DIAG] view own keys:', viewOwnKeys.join(', ') || '(none)');
+        } catch(e) {
+          console.log('[earlhamHWTable DIAG] view own keys threw:', e.message);
+        }
+
+        // ── view prototype methods ──────────────────────────────────────────
         var proto = Object.getPrototypeOf(view);
         var viewMethods = Object.getOwnPropertyNames(proto || {})
                             .filter(function(k){ return k !== 'constructor'; });
         console.log('[earlhamHWTable DIAG] view proto methods:', viewMethods.join(', '));
 
         var tryGet = function(label, fn) {
-          try { var v = fn(); console.log('[earlhamHWTable DIAG]', label, '->', v); }
-          catch(e) { console.log('[earlhamHWTable DIAG]', label, 'threw:', e.message); }
+          try { var v = fn(); console.log('[earlhamHWTable DIAG]', label, '->', String(v)); }
+          catch(e) { console.log('[earlhamHWTable DIAG]', label, 'threw:', String(e)); }
         };
 
-        // Try all view methods found on the prototype
+        // Try all view prototype methods (no-arg)
         viewMethods.forEach(function(m) {
           if (m !== 'get' && m !== 'session' && m !== 'parent') {
             tryGet('view.' + m + '()', function(){ return view[m](); });
           }
         });
 
+        // ── view.data with variable names (data() threw rather than "not a function") ──
+        ['targets', 'dates', 'vars', null].forEach(function(arg_) {
+          var label = 'view.data(' + JSON.stringify(arg_) + ')';
+          try {
+            var v = (arg_ === null) ? view.data() : view.data(arg_);
+            console.log('[earlhamHWTable DIAG]', label, '->', String(v));
+          } catch(e) {
+            console.log('[earlhamHWTable DIAG]', label, 'threw:', String(e));
+          }
+        });
+
+        // ── view.get with alternate var names ──────────────────────────────
+        ['targets', 'dates', 'equip', 'range', 'span', 'navId', 'siteRef'].forEach(function(n) {
+          try {
+            var v = view.get(n);
+            console.log('[earlhamHWTable DIAG] view.get(' + n + ') ->', String(v), '| typeof:', typeof v);
+          } catch(e) {}
+        });
+
+        // ── session ─────────────────────────────────────────────────────────
         var sess = view.session();
         var sessProto = Object.getPrototypeOf(sess);
         var sessMethods = Object.getOwnPropertyNames(sessProto || {})
                             .filter(function(k){ return k !== 'constructor'; });
         console.log('[earlhamHWTable DIAG] session methods:', sessMethods.join(', '));
 
-        // Try any session method that sounds date/nav/state related
+        // Try session methods matching date/nav/state/var/range keywords
         sessMethods.forEach(function(m) {
           if (/date|nav|ctx|state|var|range|ui|cur|get/i.test(m)) {
             tryGet('sess.' + m + '()', function(){ return sess[m](); });
           }
         });
       } catch(diagErr) {
-        console.log('[earlhamHWTable DIAG] diagnostic threw:', diagErr.message);
+        console.log('[earlhamHWTable DIAG] diagnostic threw:', String(diagErr));
       }
     }
     // ── End diagnostic ────────────────────────────────────────────────────────
