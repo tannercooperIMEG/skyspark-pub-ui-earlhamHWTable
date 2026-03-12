@@ -124,6 +124,43 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     elem.style.width  = '100%';
     elem.style.height = '100%';
 
+    // ── One-time API diagnostic ───────────────────────────────────────────────
+    // Dumps the structure of arg and view so we can find the right variable path.
+    // Remove once variable reading is confirmed working.
+    if (!window._hwTableDiagDone) {
+      window._hwTableDiagDone = true;
+      try {
+        console.log('[HW DIAG] arg keys:', Object.keys(arg || {}));
+        var proto = Object.getPrototypeOf(view);
+        console.log('[HW DIAG] view proto methods:',
+          Object.getOwnPropertyNames(proto || {}).filter(function(k){ return k !== 'constructor'; }));
+        var tryGet = function(label, fn) {
+          try { var v = fn(); console.log('[HW DIAG]', label, '->', v); }
+          catch(e) { console.log('[HW DIAG]', label, 'threw:', e.message); }
+        };
+        tryGet('view.rec',         function(){ return view.rec; });
+        tryGet('view.model',       function(){ return view.model; });
+        tryGet('view.vars()',      function(){ return view.vars(); });
+        tryGet('view.cur()',       function(){ return view.cur(); });
+        tryGet('view.data()',      function(){ return view.data(); });
+        tryGet('view.ctx()',       function(){ return view.ctx(); });
+        tryGet('view.nav()',       function(){ return view.nav(); });
+        tryGet('arg.model',        function(){ return arg.model; });
+        tryGet('arg.vars',         function(){ return arg.vars; });
+        tryGet('arg.ctx',          function(){ return arg.ctx; });
+        var sess = view.session();
+        var sessProto = Object.getPrototypeOf(sess);
+        console.log('[HW DIAG] session proto methods:',
+          Object.getOwnPropertyNames(sessProto || {}).filter(function(k){ return k !== 'constructor'; }));
+        tryGet('session.nav()',    function(){ return sess.nav(); });
+        tryGet('session.ctx()',    function(){ return sess.ctx(); });
+        tryGet('session.dates()',  function(){ return sess.dates(); });
+      } catch(diagErr) {
+        console.log('[HW DIAG] diagnostic threw:', diagErr.message);
+      }
+    }
+    // ── End diagnostic ────────────────────────────────────────────────────────
+
     // ── Session credentials ──────────────────────────────────────────────────
     var session     = view.session();
     var attestKey   = session.attestKey();
