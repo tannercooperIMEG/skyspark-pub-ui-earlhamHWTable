@@ -172,23 +172,53 @@ window.earlhamHWTable = window.earlhamHWTable || {};
           }
         });
 
-        // ── view.data with variable names (data() threw rather than "not a function") ──
-        ['targets', 'dates', 'vars', null].forEach(function(arg_) {
-          var label = 'view.data(' + JSON.stringify(arg_) + ')';
-          try {
-            var v = (arg_ === null) ? view.data() : view.data(arg_);
-            console.log('[earlhamHWTable DIAG]', label, '->', String(v));
-          } catch(e) {
-            console.log('[earlhamHWTable DIAG]', label, 'threw:', String(e));
-          }
-        });
+        // ── arg.callback value ──────────────────────────────────────────────
+        console.log('[earlhamHWTable DIAG] arg.callback value:', arg.callback);
 
-        // ── view.get with alternate var names ──────────────────────────────
-        ['targets', 'dates', 'equip', 'range', 'span', 'navId', 'siteRef'].forEach(function(n) {
-          try {
-            var v = view.get(n);
-            console.log('[earlhamHWTable DIAG] view.get(' + n + ') ->', String(v), '| typeof:', typeof v);
-          } catch(e) {}
+        // ── arg.data — Fantom proxy exploration ────────────────────────────
+        try {
+          if (typeof arg.data.typeof === 'function') {
+            console.log('[earlhamHWTable DIAG] arg.data.typeof() ->', String(arg.data.typeof()));
+          }
+          var dataProto = Object.getPrototypeOf(arg.data || {});
+          var dataMethods = Object.getOwnPropertyNames(dataProto || {})
+                              .filter(function(k){ return k !== 'constructor'; });
+          console.log('[earlhamHWTable DIAG] arg.data proto methods:', dataMethods.join(', '));
+          dataMethods.forEach(function(m) {
+            if (/get|key|val|var|name|dict|has|trap|toStr/i.test(m)) {
+              tryGet('arg.data.' + m + '()', function(){ return arg.data[m](); });
+              tryGet('arg.data.' + m + '("targets")', function(){ return arg.data[m]('targets'); });
+            }
+          });
+        } catch(e) {
+          console.log('[earlhamHWTable DIAG] arg.data exploration threw:', String(e));
+        }
+
+        // ── view.peer — Fantom peer proxy exploration ───────────────────────
+        try {
+          if (typeof view.peer.typeof === 'function') {
+            console.log('[earlhamHWTable DIAG] view.peer.typeof() ->', String(view.peer.typeof()));
+          }
+          var peerProto = Object.getPrototypeOf(view.peer || {});
+          var peerMethods = Object.getOwnPropertyNames(peerProto || {})
+                              .filter(function(k){ return k !== 'constructor'; });
+          console.log('[earlhamHWTable DIAG] view.peer proto methods:', peerMethods.join(', '));
+          peerMethods.forEach(function(m) {
+            if (/get|var|node|val|state|data|trap/i.test(m)) {
+              tryGet('view.peer.' + m + '()', function(){ return view.peer[m](); });
+              tryGet('view.peer.' + m + '("targets")', function(){ return view.peer[m]('targets'); });
+            }
+          });
+        } catch(e) {
+          console.log('[earlhamHWTable DIAG] view.peer exploration threw:', String(e));
+        }
+
+        // ── view.var / view.varNode / view.node (VarNode-specific accessors) ─
+        // view.data("targets") threw CastErr: VarNode→DataNode, so try var() counterpart
+        ['var', 'varNode', 'node', 'getVar'].forEach(function(method) {
+          ['targets', 'dates'].forEach(function(n) {
+            tryGet('view.' + method + '("' + n + '")', function(){ return view[method](n); });
+          });
         });
 
         // ── session ─────────────────────────────────────────────────────────
