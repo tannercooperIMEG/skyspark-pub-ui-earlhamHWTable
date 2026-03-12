@@ -41,24 +41,17 @@ window.earlhamHWTable = window.earlhamHWTable || {};
   }
 
   /**
-   * Safely read a named variable from the SkySpark view (or its parent).
-   * Logs the raw value and any exception for diagnostics.
+   * Read a named VarNode from the SkySpark view using view.var(name).
    * Returns the Axon string representation, or null if not set.
    */
   function tryReadVar(view, varName) {
     try {
-      var val = view.get(varName);
-      console.log('[earlhamHWTable] tryReadVar', varName, '->', val,
-                  '| type:', typeof val,
-                  '| toStr?', !!(val && val.toStr),
-                  '| toAxon?', !!(val && val.toAxon));
+      var val = view.var(varName);
       if (val == null) return null;
-      if (val.toAxon) return val.toAxon();   // prefer Axon encoding if available
+      if (val.toAxon) return val.toAxon();   // Ref → "@nav:equip.all"
       if (val.toStr)  return val.toStr();
       return String(val);
-    } catch (e) {
-      console.log('[earlhamHWTable] tryReadVar', varName, 'threw:', e.message);
-    }
+    } catch (e) { /* variable not set or not found */ }
     return null;
   }
 
@@ -123,122 +116,6 @@ window.earlhamHWTable = window.earlhamHWTable || {};
     // Force elem to fill the SkySpark view pane
     elem.style.width  = '100%';
     elem.style.height = '100%';
-
-    // ── One-time API diagnostic ───────────────────────────────────────────────
-    // Dumps the structure of arg and view so we can find the right variable path.
-    // Remove once variable reading is confirmed working.
-    if (!window._hwTableDiagDone) {
-      window._hwTableDiagDone = true;
-      try {
-        // ── arg keys (with typeof) ──────────────────────────────────────────
-        var argKeys = Object.keys(arg || {});
-        console.log('[earlhamHWTable DIAG] arg keys:', argKeys.join(', '));
-
-        argKeys.forEach(function(k) {
-          if (k !== 'view' && k !== 'elem') {
-            var v = arg[k];
-            var t = typeof v;
-            var extra = '';
-            if (t === 'object' && v !== null) {
-              try { extra = ' | obj-keys: ' + Object.keys(v).join(','); } catch(e) {}
-            }
-            console.log('[earlhamHWTable DIAG] arg.' + k, '| typeof:', t, extra);
-          }
-        });
-
-        // ── view own enumerable keys ────────────────────────────────────────
-        try {
-          var viewOwnKeys = Object.keys(view || {});
-          console.log('[earlhamHWTable DIAG] view own keys:', viewOwnKeys.join(', ') || '(none)');
-        } catch(e) {
-          console.log('[earlhamHWTable DIAG] view own keys threw:', e.message);
-        }
-
-        // ── view prototype methods ──────────────────────────────────────────
-        var proto = Object.getPrototypeOf(view);
-        var viewMethods = Object.getOwnPropertyNames(proto || {})
-                            .filter(function(k){ return k !== 'constructor'; });
-        console.log('[earlhamHWTable DIAG] view proto methods:', viewMethods.join(', '));
-
-        var tryGet = function(label, fn) {
-          try { var v = fn(); console.log('[earlhamHWTable DIAG]', label, '->', String(v)); }
-          catch(e) { console.log('[earlhamHWTable DIAG]', label, 'threw:', String(e)); }
-        };
-
-        // Try all view prototype methods (no-arg)
-        viewMethods.forEach(function(m) {
-          if (m !== 'get' && m !== 'session' && m !== 'parent') {
-            tryGet('view.' + m + '()', function(){ return view[m](); });
-          }
-        });
-
-        // ── arg.callback value ──────────────────────────────────────────────
-        console.log('[earlhamHWTable DIAG] arg.callback value:', arg.callback);
-
-        // ── arg.data — Fantom proxy exploration ────────────────────────────
-        try {
-          if (typeof arg.data.typeof === 'function') {
-            console.log('[earlhamHWTable DIAG] arg.data.typeof() ->', String(arg.data.typeof()));
-          }
-          var dataProto = Object.getPrototypeOf(arg.data || {});
-          var dataMethods = Object.getOwnPropertyNames(dataProto || {})
-                              .filter(function(k){ return k !== 'constructor'; });
-          console.log('[earlhamHWTable DIAG] arg.data proto methods:', dataMethods.join(', '));
-          dataMethods.forEach(function(m) {
-            if (/get|key|val|var|name|dict|has|trap|toStr/i.test(m)) {
-              tryGet('arg.data.' + m + '()', function(){ return arg.data[m](); });
-              tryGet('arg.data.' + m + '("targets")', function(){ return arg.data[m]('targets'); });
-            }
-          });
-        } catch(e) {
-          console.log('[earlhamHWTable DIAG] arg.data exploration threw:', String(e));
-        }
-
-        // ── view.peer — Fantom peer proxy exploration ───────────────────────
-        try {
-          if (typeof view.peer.typeof === 'function') {
-            console.log('[earlhamHWTable DIAG] view.peer.typeof() ->', String(view.peer.typeof()));
-          }
-          var peerProto = Object.getPrototypeOf(view.peer || {});
-          var peerMethods = Object.getOwnPropertyNames(peerProto || {})
-                              .filter(function(k){ return k !== 'constructor'; });
-          console.log('[earlhamHWTable DIAG] view.peer proto methods:', peerMethods.join(', '));
-          peerMethods.forEach(function(m) {
-            if (/get|var|node|val|state|data|trap/i.test(m)) {
-              tryGet('view.peer.' + m + '()', function(){ return view.peer[m](); });
-              tryGet('view.peer.' + m + '("targets")', function(){ return view.peer[m]('targets'); });
-            }
-          });
-        } catch(e) {
-          console.log('[earlhamHWTable DIAG] view.peer exploration threw:', String(e));
-        }
-
-        // ── view.var / view.varNode / view.node (VarNode-specific accessors) ─
-        // view.data("targets") threw CastErr: VarNode→DataNode, so try var() counterpart
-        ['var', 'varNode', 'node', 'getVar'].forEach(function(method) {
-          ['targets', 'dates'].forEach(function(n) {
-            tryGet('view.' + method + '("' + n + '")', function(){ return view[method](n); });
-          });
-        });
-
-        // ── session ─────────────────────────────────────────────────────────
-        var sess = view.session();
-        var sessProto = Object.getPrototypeOf(sess);
-        var sessMethods = Object.getOwnPropertyNames(sessProto || {})
-                            .filter(function(k){ return k !== 'constructor'; });
-        console.log('[earlhamHWTable DIAG] session methods:', sessMethods.join(', '));
-
-        // Try session methods matching date/nav/state/var/range keywords
-        sessMethods.forEach(function(m) {
-          if (/date|nav|ctx|state|var|range|ui|cur|get/i.test(m)) {
-            tryGet('sess.' + m + '()', function(){ return sess[m](); });
-          }
-        });
-      } catch(diagErr) {
-        console.log('[earlhamHWTable DIAG] diagnostic threw:', String(diagErr));
-      }
-    }
-    // ── End diagnostic ────────────────────────────────────────────────────────
 
     // ── Session credentials ──────────────────────────────────────────────────
     var session     = view.session();
