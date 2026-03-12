@@ -12,7 +12,7 @@ var earlhamHWTableHandler = {};
 
 (function () {
   var BASE_URL = '/pub/ui/earlhamHWTable/';
-  var VERSION  = '12';  // bump this when deploying updated module files
+  var VERSION  = '13';  // bump this when deploying updated module files
   var modules = [
     'utils/api.js',
     'evals/loadDemandData.js',

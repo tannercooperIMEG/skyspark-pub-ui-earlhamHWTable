@@ -42,22 +42,40 @@ window.earlhamHWTable = window.earlhamHWTable || {};
 
   /**
    * Safely read a named variable from the SkySpark view (or its parent).
+   * Logs the raw value and any exception for diagnostics.
    * Returns the Axon string representation, or null if not set.
    */
   function tryReadVar(view, varName) {
     try {
       var val = view.get(varName);
-      if (val) return val.toStr ? val.toStr() : String(val);
-    } catch (e) {}
+      console.log('[earlhamHWTable] tryReadVar', varName, '->', val,
+                  '| type:', typeof val,
+                  '| toStr?', !!(val && val.toStr),
+                  '| toAxon?', !!(val && val.toAxon));
+      if (val == null) return null;
+      if (val.toAxon) return val.toAxon();   // prefer Axon encoding if available
+      if (val.toStr)  return val.toStr();
+      return String(val);
+    } catch (e) {
+      console.log('[earlhamHWTable] tryReadVar', varName, 'threw:', e.message);
+    }
     return null;
   }
 
   /**
    * Clear tableContainer, show a loading indicator, fetch data, then render.
-   * Uses a generation counter so stale responses from superseded fetches are
-   * silently discarded.
+   * Skips the fetch entirely if the targets+dates key matches the last
+   * successful fetch — prevents redundant API calls when SkySpark fires
+   * onUpdate multiple times for the same view state.
+   * Uses a generation counter so stale in-flight responses are discarded.
    */
   function refreshData(tableContainer, attestKey, projectName, targets, dates) {
+    var fetchKey = targets + '\x00' + dates;
+    if (tableContainer.getAttribute('data-fetch-key') === fetchKey) {
+      return; // same parameters already fetched — skip
+    }
+    tableContainer.setAttribute('data-fetch-key', fetchKey);
+
     var gen = ++_fetchGen;
 
     tableContainer.innerHTML = '';
